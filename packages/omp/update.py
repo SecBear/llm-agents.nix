@@ -3,9 +3,9 @@
 
 """Update script for omp (oh-my-pi) package.
 
-Custom updater needed because omp uses both bun2nix (bun.nix must be
-regenerated) and fetchCargoVendor (cargoHash must be recalculated) on
-each version bump.  nix-update cannot handle either of these.
+Linux builds from source and needs both bun2nix regeneration plus a recalculated
+cargoHash. Darwin still uses upstream release binaries plus native addon assets
+because the source-build packaging is currently Linux-only in llm-agents.nix.
 """
 
 import re
@@ -34,20 +34,33 @@ BUN_NIX = PKG_DIR / "bun.nix"
 
 OWNER = "can1357"
 REPO = "oh-my-pi"
+DARWIN_RELEASES = {
+    "aarch64-darwin": {
+        "binary": "omp-darwin-arm64",
+        "native": ["pi_natives.darwin-arm64.node"],
+    },
+    "x86_64-darwin": {
+        "binary": "omp-darwin-x64",
+        "native": [
+            "pi_natives.darwin-x64-baseline.node",
+            "pi_natives.darwin-x64-modern.node",
+        ],
+    },
+}
 
 
 def strip_workspace_entries(bun_nix: Path) -> None:
     """Remove workspace copyPathToStore entries from bun.nix.
 
     Workspace packages resolve relative to bun.nix, which is in
-    packages/omp/ -- not the source root.  The bun2nix hook resolves
+    packages/omp/ -- not the source root. The bun2nix hook resolves
     workspace deps from the source tree during bun install, so these
     entries are unnecessary and would fail to evaluate.
     """
     text = bun_nix.read_text()
     text = re.sub(r"  copyPathToStore,\n", "", text)
     text = re.sub(
-        r"  \"@oh-my-pi/[^\"]*\"\s*=\s*copyPathToStore\s+[^;]+;\n",
+        r'  "@oh-my-pi/[^\"]*"\s*=\s*copyPathToStore\s+[^;]+;\n',
         "",
         text,
     )
@@ -58,6 +71,28 @@ def strip_workspace_entries(bun_nix: Path) -> None:
         check=True,
         capture_output=True,
     )
+
+
+def darwin_release_hashes(version: str) -> dict[str, dict[str, object]]:
+    """Calculate hashes for the Darwin release binaries and native addons."""
+    result: dict[str, dict[str, object]] = {}
+    for system, assets in DARWIN_RELEASES.items():
+        binary_name = assets["binary"]
+        binary_url = f"https://github.com/{OWNER}/{REPO}/releases/download/v{version}/{binary_name}"
+        native = []
+        for name in assets["native"]:
+            native_url = (
+                f"https://github.com/{OWNER}/{REPO}/releases/download/v{version}/{name}"
+            )
+            native.append({"name": name, "hash": calculate_url_hash(native_url)})
+        result[system] = {
+            "binary": {
+                "name": binary_name,
+                "hash": calculate_url_hash(binary_url),
+            },
+            "native": native,
+        }
+    return result
 
 
 def main() -> None:
@@ -74,19 +109,22 @@ def main() -> None:
 
     print(f"Updating omp from {current} to {latest}")
 
-    # Step 1: Calculate new source hash
+    # Step 1: Calculate new source hash and Darwin release hashes.
     print("Calculating source hash...")
     url = f"https://github.com/{OWNER}/{REPO}/archive/refs/tags/v{latest}.tar.gz"
     source_hash = calculate_url_hash(url, unpack=True)
+    print("Calculating Darwin release hashes...")
+    binary_hashes = darwin_release_hashes(latest)
 
     data = {
         "version": latest,
         "hash": source_hash,
         "cargoHash": DUMMY_SHA256_HASH,
+        "hashes": binary_hashes,
     }
     save_hashes(HASHES_FILE, data)
 
-    # Step 2: Regenerate bun.nix from upstream bun.lock
+    # Step 2: Regenerate bun.nix from upstream bun.lock.
     clone_and_generate_bun_nix(
         OWNER,
         REPO,
@@ -97,7 +135,7 @@ def main() -> None:
     )
     strip_workspace_entries(BUN_NIX)
 
-    # Step 3: Calculate cargoHash
+    # Step 3: Calculate cargoHash from the Linux source build.
     try:
         cargo_hash = calculate_dependency_hash(".#omp", "cargoHash", HASHES_FILE, data)
         data["cargoHash"] = cargo_hash

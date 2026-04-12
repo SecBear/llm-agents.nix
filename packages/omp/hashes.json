@@ -1,5 +1,35 @@
 {
-  "version": "14.1.0",
-  "hash": "sha256-XmmWRQwhQYaoz5kdySPhNHC0jt9fuofDNfRQEsq1e8U=",
-  "cargoHash": "sha256-raG0zLW3pICP3tsFKUUSZEzV8a1gy3j7/DVSzTsczjI="
+   "version": "14.1.0",
+   "hash": "sha256-XmmWRQwhQYaoz5kdySPhNHC0jt9fuofDNfRQEsq1e8U=",
+   "cargoHash": "sha256-raG0zLW3pICP3tsFKUUSZEzV8a1gy3j7/DVSzTsczjI=",
+   "hashes": {
+      "aarch64-darwin": {
+         "binary": {
+            "name": "omp-darwin-arm64",
+            "hash": "sha256-DON8EpxqpxwUpBiHccBRBAZaVEMPYQh7Ynf5QMtJnMk="
+         },
+         "native": [
+            {
+               "name": "pi_natives.darwin-arm64.node",
+               "hash": "sha256-g+FI1tfGgiMK7nORji9SjxZzAHe/kTM3+78Y1haQjCs="
+            }
+         ]
+      },
+      "x86_64-darwin": {
+         "binary": {
+            "name": "omp-darwin-x64",
+            "hash": "sha256-iCsVFVe1JVyobdV18gSGk5yk2qpYV0eHGXg6lcX/890="
+         },
+         "native": [
+            {
+               "name": "pi_natives.darwin-x64-baseline.node",
+               "hash": "sha256-Alo1ndfzGFP0pHPX8w6VSyFd3tZjj0tcj97Fhb6mL9w="
+            },
+            {
+               "name": "pi_natives.darwin-x64-modern.node",
+               "hash": "sha256-IxYBZux3KH7sY8cd7EFERp/MS1Qxgv1Go19GBcnKPkw="
+            }
+         ]
+      }
+   }
 }
